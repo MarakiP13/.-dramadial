@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DramaDial</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f4f5fb;
+      color: #222;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1 {
+      margin: 0 0 5px 0;
+      font-size: 24px;
+      letter-spacing: 0.04em;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #555;
+    }
+
+    /* Centered three column layout */
+    .layout {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .panel {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+      padding: 16px 18px;
+      min-width: 0;
+    }
+
+    /* Left and right panels narrower */
+    #leftPanel, #rightPanel {
+      max-width: 260px;
+      flex: 0 0 260px;
+    }
+
+    /* Center table panel wider */
+    #tablePanel {
+      flex: 0 0 420px;
+      text-align: center;
+    }
+
+    label {
+      font-size: 13px;
+      display: block;
+      margin-bottom: 4px;
+      color: #444;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 7px 9px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    button {
+      border-radius: 999px;
+      padding: 7px 14px;
+      border: none;
+      background: #4353ff;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    button.secondary {
+      background: #edf0ff;
+      color: #324;
+    }
+
+    #guestList {
+      list-style: none;
+      padding-left: 0;
+      margin: 6px 0 0 0;
+      max-height: 260px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    #guestList li {
+      padding: 4px 0;
+      border-bottom: 1px dotted #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Table layout */
+    #tableViewWrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #tableView {
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      border: 2px dashed #d5d7e6;
+      background: radial-gradient(circle at center, #fff 0, #f6f7ff 60%, #eef0ff 100%);
+      position: relative;
+      margin: 0 auto;
+    }
+
+    .seat {
+      position: absolute;
+      padding: 6px 10px;
+      min-width: 60px;
+      background: #ffffff;
+      border-radius: 999px;
+      border: 1px solid #ccd0ff;
+      font-size: 11px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+      cursor: grab;
+      user-select: none;
+      text-align: center;
+    }
+
+    .seat.dragging {
+      opacity: 0.6;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: #777;
+      margin-top: 10px;
+    }
+
+    .score-info {
+      font-size: 12px;
+      margin-top: 8px;
+      color: #555;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      #leftPanel, #rightPanel {
+        display: none;
+      }
+      #tablePanel {
+        width: 100 percent;
+      }
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>DramaDial</h1>
+  <div class="subtitle">Holiday seating planner where you set harmony or chaos for the table.</div>
+
+  <div class="layout">
+
+    <!-- LEFT PANEL. Guests -->
+    <section class="panel" id="leftPanel">
+      <h2>Guests</h2>
+
+      <label>Name</label>
+      <input id="guestName" type="text" placeholder="Aunt Maria" />
+
+      <label>Vibe tag</label>
+      <select id="guestTag">
+        <option value="Calm">Calm</option>
+        <option value="Shy">Shy</option>
+        <option value="Sensitive">Sensitive</option>
+        <option value="Extrovert">Extrovert</option>
+        <option value="Opinionated">Opinionated</option>
+        <option value="Chaos Lover">Chaos Lover</option>
+      </select>
+
+      <button id="addGuestBtn">Add guest</button>
+
+      <!-- Templates -->
+      <h3 style="font-size:14px; margin-top:15px;">Templates</h3>
+
+      <select id="templateSelect">
+        <option value="">Choose a template</option>
+        <option value="family">Classic Family Holiday</option>
+        <option value="friendsgiving">Friendsgiving</option>
+        <option value="office">Office Party</option>
+        <option value="diplomatic">Diplomatic Dinner</option>
+        <option value="chaoticxmas">Chaotic Christmas</option>
+      </select>
+
+      <button id="loadTemplateBtn" class="secondary">Load Template</button>
+
+      <ul id="guestList"></ul>
+    </section>
+
+    <!-- CENTER PANEL. Table -->
+    <section class="panel" id="tablePanel">
+      <h2>Table Layout</h2>
+
+      <div id="tableViewWrapper">
+        <div id="tableView"></div>
+        <div class="hint">Drag seats. Tune the drama. Export the layout.</div>
+      </div>
+
+      <canvas id="exportCanvas" width="900" height="900" style="display:none;"></canvas>
+    </section>
+
+    <!-- RIGHT PANEL. Controls -->
+    <section class="panel" id="rightPanel">
+      <h2>Drama Controls</h2>
+
+      <label>Drama avoidance</label>
+      <input id="avoidDial" type="range" min="0" max="100" value="70" />
+      <div><span id="avoidValue">70</span> percent harmony priority</div>
+
+      <label style="margin-top:10px;">Drama enhancement</label>
+      <input id="chaosDial" type="range" min="0" max="100" value="0" />
+      <div><span id="chaosValue">0</span> percent chaos priority</div>
+
+      <button id="optimizeBtn" style="margin-top:12px;">Optimize Seating</button>
+      <button id="shuffleBtn" class="secondary">Shuffle</button>
+      <button id="exportPngBtn" class="secondary">Export PNG</button>
+      <button id="printBtn" class="secondary">Print or Save</button>
+
+      <div class="score-info">
+        Score. <span id="scoreDisplay">n.a.</span>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+  const guests = [];
+  let seatingOrder = [];
+
+  const guestNameInput = document.getElementById("guestName");
+  const guestTagSelect = document.getElementById("guestTag");
+  const guestListEl = document.getElementById("guestList");
+  const tableViewEl = document.getElementById("tableView");
+  const scoreDisplay = document.getElementById("scoreDisplay");
+
+  const avoidDial = document.getElementById("avoidDial");
+  const chaosDial = document.getElementById("chaosDial");
+  const avoidValue = document.getElementById("avoidValue");
+  const chaosValue = document.getElementById("chaosValue");
+
+  document.getElementById("addGuestBtn").addEventListener("click", addGuest);
+  document.getElementById("optimizeBtn").addEventListener("click", optimizeSeatingAndRender);
+  document.getElementById("shuffleBtn").addEventListener("click", shuffleSeating);
+  document.getElementById("exportPngBtn").addEventListener("click", exportPNG);
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+
+  avoidDial.addEventListener("input", () => avoidValue.textContent = avoidDial.value);
+  chaosDial.addEventListener("input", () => chaosValue.textContent = chaosDial.value);
+
+  /* -----------------------
+     GUEST TEMPLATES
+     ----------------------- */
+  const GUEST_TEMPLATES = {
+    family: [
+      { name: "Aunt Maria", tag: "Opinionated" },
+      { name: "Uncle Nikos", tag: "Calm" },
+      { name: "Grandma Sophia", tag: "Sensitive" },
+      { name: "Cousin Alex", tag: "Chaos Lover" },
+      { name: "Dimitra", tag: "Extrovert" },
+      { name: "Your Partner", tag: "Calm" },
+      { name: "The Kid", tag: "Shy" }
+    ],
+    friendsgiving: [
+      { name: "Jordan", tag: "Opinionated" },
+      { name: "Maya", tag: "Extrovert" },
+      { name: "Sam", tag: "Calm" },
+      { name: "Leo", tag: "Chaos Lover" },
+      { name: "Rina", tag: "Sensitive" },
+      { name: "Chris", tag: "Calm" }
+    ],
+    office: [
+      { name: "The Boss", tag: "Opinionated" },
+      { name: "HR Manager", tag: "Calm" },
+      { name: "IT Guy", tag: "Shy" },
+      { name: "Marketing Lead", tag: "Extrovert" },
+      { name: "The Intern", tag: "Chaos Lover" },
+      { name: "The Gossip", tag: "Sensitive" }
+    ],
+    diplomatic: [
+      { name: "Ambassador A", tag: "Calm" },
+      { name: "Ambassador B", tag: "Calm" },
+      { name: "Advisor 1", tag: "Opinionated" },
+      { name: "Advisor 2", tag: "Opinionated" },
+      { name: "Press Officer", tag: "Shy" },
+      { name: "Cultural Attaché", tag: "Extrovert" }
+    ],
+    chaoticxmas: [
+      { name: "The Drama Uncle", tag: "Chaos Lover" },
+      { name: "The Peacemaker", tag: "Calm" },
+      { name: "The Teenager", tag: "Sensitive" },
+      { name: "The Cousin Back From Abroad", tag: "Extrovert" },
+      { name: "The Neighbor Who Just Showed Up", tag: "Chaos Lover" },
+      { name: "Your Mother", tag: "Opinionated" }
+    ]
+  };
+
+  document.getElementById("loadTemplateBtn").addEventListener("click", () => {
+    const key = document.getElementById("templateSelect").value;
+    if (key) loadTemplate(key);
+  });
+
+  function loadTemplate(key) {
+    const data = GUEST_TEMPLATES[key];
+    if (!data) return;
+    data.forEach(t => {
+      guests.push({
+        id: Date.now() + Math.random(),
+        name: t.name,
+        tag: t.tag
+      });
+    });
+    seatingOrder = guests.slice();
+    renderGuests();
+    renderSeating();
+  }
+
+  /* ----------------------
+     ADD AND REMOVE GUESTS
+     ---------------------- */
+  function addGuest() {
+    const name = guestNameInput.value.trim();
+    if (!name) return;
+    const tag = guestTagSelect.value;
+    guests.push({
+      id: Date.now() + Math.random(),
+      name,
+      tag
+    });
+    seatingOrder = guests.slice();
+    guestNameInput.value = "";
+    renderGuests();
+    renderSeating();
+  }
+
+  function removeGuest(id) {
+    const idx = guests.findIndex(g => g.id === id);
+    if (idx !== -1) guests.splice(idx, 1);
+    seatingOrder = seatingOrder.filter(g => g.id !== id);
+    renderGuests();
+    renderSeating();
+  }
+
+  function renderGuests() {
+    guestListEl.innerHTML = "";
+    guests.forEach(g => {
+      const li = document.createElement("li");
+      li.textContent = g.name + " (" + g.tag + ")";
+      const removeBtn = document.createElement("button");
+      removeBtn.textContent = "x";
+      removeBtn.style.background = "transparent";
+      removeBtn.style.color = "#c33";
+      removeBtn.style.border = "none";
+      removeBtn.style.cursor = "pointer";
+      removeBtn.addEventListener("click", () => removeGuest(g.id));
+      li.appendChild(removeBtn);
+      guestListEl.appendChild(li);
+    });
+  }
+
+  /* ---------------------
+     SCORING
+     --------------------- */
+  function spiceForTag(tag) {
+    switch (tag) {
+      case "Calm": return 0;
+      case "Shy": return 0;
+      case "Sensitive": return 1;
+      case "Extrovert": return 1;
+      case "Opinionated": return 2;
+      case "Chaos Lover": return 3;
+      default: return 1;
+    }
+  }
+
+  function getWeights() {
+    return {
+      wHarmony: parseInt(avoidDial.value, 10) / 100,
+      wDrama: parseInt(chaosDial.value, 10) / 100
+    };
+  }
+
+  function pairScore(a, b, weights) {
+    if (!a || !b) return 0;
+    const sA = spiceForTag(a.tag);
+    const sB = spiceForTag(b.tag);
+    const harmony = -Math.abs(sA - sB);
+    const drama = sA + sB;
+    return weights.wHarmony * harmony + weights.wDrama * drama;
+  }
+
+  function scoreArrangement(order) {
+    if (order.length < 2) return 0;
+    const weights = getWeights();
+    let total = 0;
+    for (let i = 0; i < order.length; i++) {
+      const a = order[i];
+      const b = order[(i + 1) % order.length];
+      total += pairScore(a, b, weights);
+    }
+    return total;
+  }
+
+  /* ---------------------
+     OPTIMIZER
+     --------------------- */
+  function optimizeSeatingAndRender() {
+    if (guests.length < 2) return;
+    seatingOrder = optimizeSeating(guests);
+    renderSeating();
+  }
+
+  function optimizeSeating(list) {
+    let current = list.slice();
+    let best = current.slice();
+    let bestScore = scoreArrangement(best);
+
+    for (let i = 0; i < 1200; i++) {
+      const i1 = Math.floor(Math.random() * list.length);
+      let i2 = Math.floor(Math.random() * list.length);
+      if (i1 === i2) continue;
+      const test = best.slice();
+      const tmp = test[i1];
+      test[i1] = test[i2];
+      test[i2] = tmp;
+      const score = scoreArrangement(test);
+      if (score > bestScore) {
+        bestScore = score;
+        best = test;
+      }
+    }
+    return best;
+  }
+
+  function shuffleSeating() {
+    seatingOrder = guests.slice();
+    for (let i = seatingOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = seatingOrder[i];
+      seatingOrder[i] = seatingOrder[j];
+      seatingOrder[j] = t;
+    }
+    renderSeating();
+  }
+
+  /* ---------------------
+     TABLE RENDERING
+     --------------------- */
+  function renderSeating() {
+    tableViewEl.innerHTML = "";
+    if (guests.length === 0) {
+      scoreDisplay.textContent = "Add guests to see layout";
+      return;
+    }
+
+    if (seatingOrder.length !== guests.length) seatingOrder = guests.slice();
+
+    const score = scoreArrangement(seatingOrder);
+    scoreDisplay.textContent = score.toFixed(2);
+
+    const w = tableViewEl.clientWidth;
+    const h = tableViewEl.clientHeight;
+    const cx = w / 2;
+    const cy = h / 2;
+    const radius = Math.min(w, h) / 2 - 40;
+
+    seatingOrder.forEach((g, index) => {
+      const angle = (2 * Math.PI * index) / seatingOrder.length - Math.PI / 2;
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+
+      const seat = document.createElement("div");
+      seat.className = "seat";
+      seat.style.left = x + "px";
+      seat.style.top = y + "px";
+      seat.textContent = g.name + " . " + g.tag;
+
+      attachDragHandlers(seat, index);
+      tableViewEl.appendChild(seat);
+    });
+  }
+
+  function attachDragHandlers(seat, index) {
+    seat.draggable = true;
+
+    seat.addEventListener("dragstart", e => {
+      seat.classList.add("dragging");
+      e.dataTransfer.setData("text", index);
+    });
+
+    seat.addEventListener("dragend", () => {
+      seat.classList.remove("dragging");
+    });
+
+    seat.addEventListener("dragover", e => e.preventDefault());
+
+    seat.addEventListener("drop", e => {
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData("text"), 10);
+      const to = index;
+      const temp = seatingOrder[from];
+      seatingOrder[from] = seatingOrder[to];
+      seatingOrder[to] = temp;
+      renderSeating();
+    });
+  }
+
+  /* ---------------------
+     PNG EXPORT
+     --------------------- */
+  function exportPNG() {
+    if (seatingOrder.length === 0) return;
+
+    const canvas = document.getElementById("exportCanvas");
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const radius = 260;
+
+    ctx.strokeStyle = "#d0d3ff";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius + 40, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.font = "16px Arial";
+    ctx.textAlign = "center";
+
+    const n = seatingOrder.length;
+    seatingOrder.forEach((g, i) => {
+      const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+
+      ctx.beginPath();
+      ctx.arc(x, y, 40, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.strokeStyle = "#bfc4ff";
+      ctx.stroke();
+
+      ctx.fillStyle = "#222";
+      ctx.fillText(g.name, x, y - 6);
+      ctx.fillStyle = "#666";
+      ctx.fillText(g.tag, x, y + 10);
+    });
+
+    const link = document.createElement("a");
+    link.download = "dramadial.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }
+
+  renderSeating();
+</script>
+
+</body>
+</html>
